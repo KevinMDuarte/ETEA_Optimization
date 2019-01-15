@@ -24,8 +24,10 @@ int main(int argc, char *argv[]){
   char trans = 'T';
   char left ='L';
   char right = 'R';
-  int zero = 0;
-  int one = 1;
+  int iZero = 0;
+  int iOne = 1;
+  double dZero = 0.;
+  double dOne = 1.;
   int two = 2;
   int info;
 
@@ -60,9 +62,8 @@ int main(int argc, char *argv[]){
   // Seed for randomizer
   srand( time(NULL) );
   double random = (double)rand()/(double)RAND_MAX;
-
-    printf("random =%f \n", random);
-
+  
+    //printf("random =%f \n", random);
 
   // Initialize y
   for(i=0;i<n;i++){
@@ -78,17 +79,51 @@ int main(int argc, char *argv[]){
     Ad[n] =(double)rand()/(double)RAND_MAX;
 
   // TODO : Create copy of A(Ad,Adu,Adl)
-  
+  // Initialize B with 0
+  for(i=0;i<n;i++){
+    for(j=0;j<n;j++){
+      B[i*n+j] = 0;
+    }
+  }
+  // Set values of B
+  B[0] = (double)rand()/(double)RAND_MAX;
+  for(i=1;i<n;i++){
+    B[i*n+i] = (double)rand()/(double)RAND_MAX;
+    B[i*n+i-1] = (double)rand()/(double)RAND_MAX;
+    B[(i-1)*n+i] = B[i*n+i-1]	;
+  }
 
-  // 1.WORKING  solve A*y'=y
-  dgtsv(&n, &one, Adl, Ad, Adu, y, &n, &info);
-  // 2. compute BtB=B*B (B*B = B*transpose(B))
-  dsymm(&left, &upper, &n, &n, &one, B, &n, B, &n, &zero, BtB, &n);
-  // 3.
-  dsbmv(&upper, &n, &two, &one, BtB, &n, y, &one, &zero, b, &one);
+  // Initialize BtB with 0
+  for(i=0;i<n;i++){
+    for(j=0;j<n;j++){
+      BtB[i*n+j] = 0;
+    }
+  }
+  
+  //Initialize b with 0
+  for(i=0;i<n;i++){
+    b[i]=0;
+  }
+  
+  // 1.WORKING  solve A*y'=y. y gets overwritten with the solution
+  dgtsv(&n, &iOne, Adl, Ad, Adu, y, &n, &info);
+  printf("After 1. \n");
+
+  // 2.WORKING compute BtB=B*B (B*B = B*transpose(B) because of the symmetric property)
+  dsymm(&left, &upper, &n, &n,&dOne, B, &n, B, &n, &dZero, BtB, &n);
+  printf("After 2. \n");
+
+  // 3.WORKING copmute b=BtB*y
+  // TODO: Storage method needs to be changed to be able to use sbmv!
+  //dsbmv(&upper, &n, &two, &dOne, BtB, &n, y, &iOne, &dZero, y, &iOne);
+  dsymv(&upper, &n, &dOne, BtB, &n, y, &iOne, &dZero, b, &iOne);
+  printf("After 3. \n");
+
+  printf("\nAfter computation \n");
+  
   // 4. compute RA=R*A
   dsymm(&right, &upper, &nm1, &n, &one, A, &n, R, &n, &zero, RA, &n);
-
+  
   // TODO: for multiple iterations, insert loop beginning here
 
   // 5. compute v=R*x
