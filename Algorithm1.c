@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include "mkl.h"
+#include <string.h>
 
 int main(int argc, char *argv[]){
 
@@ -9,7 +10,7 @@ int main(int argc, char *argv[]){
   // Initial matrices
   double *A, *Ad, *Adu, *Adl,  *B, *L, *R;
   // Initial vectors
-  double *x, *y;
+  double *x, *y, *ycpy;
   // Initial parameters
   double l,r;
   r = 0.45;
@@ -37,17 +38,13 @@ int main(int argc, char *argv[]){
   int two = 2;
   int three = 3;
   int info;
-
+  int *ipiv;
 
   int n = 10;
   int nm1 = n-1; //n minus 1
 
   // Iterators
   int i,j;
-
-
-
-
 
 
   // TODO: Change the allocation size to store B in a Packed Storage. This is valid because B is symmetric
@@ -57,6 +54,7 @@ int main(int argc, char *argv[]){
   L = (double *) malloc( nm1*nm1 * sizeof(double) );
   R = (double *) malloc( n*nm1 * sizeof(double) );
   y = (double *) malloc( 1*n * sizeof(double) );
+  ycpy = (double *) malloc( 1*n * sizeof(double) );
   x = (double *) malloc( 1*n * sizeof(double) );
 
   // Allocate 3 arrays for the tridiagonal matrix A
@@ -73,7 +71,7 @@ int main(int argc, char *argv[]){
   //Vectors to store computed results
   b = (double *) malloc( 1*n * sizeof(double) );
   v = (double *) malloc( 1*nm1 * sizeof(double) );
-
+  ipiv = (int *) malloc( 1*n*sizeof(int) );
 
 
   srand( time(NULL) );
@@ -81,13 +79,19 @@ int main(int argc, char *argv[]){
 
 	//printf("random =%f \n", random);
 
-
+// Initialize ipiv
+for(i=0;i<n;i++){
+	ipiv[i] = 0;
+}
 
 // Initialize and set values of y
 for(i=0;i<n;i++){
 	//y[i] = (double)rand()/(double)RAND_MAX;
 	y[i] = 0.5;
 }
+
+// Copy y into ycpy
+memcpy(ycpy,y,n*sizeof(double));
 
 // Set values of Ad,Adu,Adl
 for(j=0;j<n-1;j++){
@@ -200,7 +204,6 @@ for(j=0;j<n;j++){
 /* Computational/Algorithm Section */
 /*---------------------------------*/
 
-
 printf("Before the computation \n");
 
   // 1.  solve A*y'=y. y gets overwritten with the solution
@@ -222,6 +225,13 @@ dsymm(&right, &upper, &nm1, &n, &dOne, A, &n, R, &nm1, &dZero, RA, &nm1);
 //dgemm(&no, &no, &nm1, &n, &n, &dOne, R, &nm1, A, &n, &dZero, RA, &nm1);
 printf("After 4. \n");
   
+
+// For multiple iteration the code will loop from stepp 5. to step 10.
+
+	
+  // 4bis. copy BtB onto Q
+memcpy(Q,BtB,n*n*sizeof(double));
+
   // 5. compute v=R*x
 dgemv(&no, &nm1, &n, &dOne, R, &nm1, x, &iOne, &dZero, v, &iOne);
 printf("After 5. \n");
@@ -234,21 +244,46 @@ printf("After 6. \n");
   
   // TODO: Set Q = copy(BtB). Use Band Storage!!!
   // 7. compute Q = P*RA+Q
-dgemm(&no, &no, &n, &n, &nm1, &dOne, P, &n, RA, &nm1, &dZero, Q, &n);
+dgemm(&no, &no, &n, &n, &nm1, &dOne, P, &n, RA, &nm1, &dOne, Q, &n);
 printf("After 7. \n");
-  
-/*----------------------------------------------*/
-/* The following section stil needs to be fixed */
-/*----------------------------------------------*/
 
-  //8. solve Q*b'=b. If psbv leads to errors, use gbsv
-  //dgbsv(&n, &two, &two, &one, QBandStorage, &n, ??ipiv?, b, &n, &info );
-//dpbsv(&upper, &n, &three, &iOne, Q, &n, b, &n, &info);
+  // 8. solve Q*b'=b. 
+  // TODO: Adapt to be able to use dgbsv(band) instead of dgesv(sym)
+//dgbsv(&n, &three, &three, &iOne, Q, &n, ipiv, b, &n, &info );
+dgesv( &n, &iOne, Q, &n, ipiv, b, &n, &info );
+
+printf("After 8. \n");
+
+//LAPACKE_dgesv(LAPACK_COL_MAJOR, n, 1, Q, n, ipiv, b, n);
+
+/*
+int *iter;
+double *xx;
+xx = (double *) malloc( 1*n * sizeof(double) );
+iter = (int *) malloc(1* sizeof(int) );
+
+LAPACKE_dsgesv (LAPACK_COL_MAJOR, n, 1, Q, n, ipiv, b, n, xx , n, iter);
+
+//PRINTS
+printf("INFO = %d \n", info);
+for(i=0;i<n;i++){
+	printf("IPIV[%d] = %d ", i, ipiv[i]);
+}
+printf("\n");
+
+printf("ITER = %d\n",iter);
+for(i=0;i<n;i++){
+	printf("xx[%d] = %d ", i, xx[i]);
+}
+*/
+
+//dpbsv(&upper, &n, &three, &iOne, Q, &n, b, &n, &info); THIS ONLY WORKS FOR SPD
 //dsysv(&upper, &n, &iOne, Q, &n, &ipiv, b, &n, );
   // TODO: set x=copy(b)?? to check
 
-  // compute x=A*b
-//dgbmv(&no, &n, &n, &one, &one, &one, A, &n, b, &one, &zero, x, &one);
+  // 9. Compute x=A*b
+dgbmv(&no, &n, &n, &iOne, &iOne, &dOne, A, &n, b, &iOne, &dZero, x, &iOne);
+
 
 printf("\nAfter computation \n");
 printf("\n");
@@ -256,7 +291,7 @@ printf("\n");
 /*---------------------------------------------*/
 /* Print every matrix and vector defined above */
 /*---------------------------------------------*/
-
+/*
 // Print A
 for(i=0;i<n;i++){
 	for(j=0;j<n;j++){
@@ -337,7 +372,7 @@ printf("\n");
 }
 
 printf("\n");
-  
+
 // Print Ad
 for(i=0;i<n;i++){
 	printf("Ad[%d] = %f ",i,Ad[i]);
@@ -360,7 +395,7 @@ for(i=0;i<nm1;i++){
 }
 
 printf("\n");
-printf("\n");   
+printf("\n"); 
   
 // Print b
 for(i=0;i<n;i++){
@@ -390,29 +425,37 @@ printf("\n");
 for(i=0;i<n;i++){
 	printf("y[%d] = %f ",i,y[i]);
 }
- 
+
 printf("\n");
 printf("\n");
 
+// Print ycpy
+for(i=0;i<n;i++){
+	printf("ycpy[%d] = %f ",i,ycpy[i]);
+}
+ 
+printf("\n");
+printf("\n");
+*/
 
 /*---------------------------------------------------------------*/
 /* Free up all the matrices and vectors defined for this problem */
 /*---------------------------------------------------------------*/
 
-  free(A);	
-  free(B);
-  free(L);
-  free(R);
-  free(y);
-  free(Ad);
-  free(Adu);
-  free(Adl);
-  free(BtB);
-  free(RA);
-  free(P);
-  free(b);
-  free(x);
-  free(v);
+free(A);	
+free(B);
+free(L);
+free(R);
+free(y);
+free(Ad);
+free(Adu);
+free(Adl);
+free(BtB);
+free(RA);
+free(P);
+free(b);
+free(x);
+free(v);
 
 /* END OF PROGRAM */
 
