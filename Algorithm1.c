@@ -5,7 +5,8 @@
 #include <string.h>
 
 int main(int argc, char *argv[]){
-
+ 
+  double s_initial,s_elapsed;	
 
   // Initial matrices
   double *A, *Ad, *Adu, *Adl,  *B, *L, *R;
@@ -204,26 +205,29 @@ for(j=0;j<n;j++){
 /* Computational/Algorithm Section */
 /*---------------------------------*/
 
-printf("Before the computation \n");
+/* begin of time measurement*/
+	s_initial = dsecnd();
+
+//printf("Before the computation \n");
 
   // 1.  solve A*y'=y. y gets overwritten with the solution
 dgtsv(&n, &iOne, Adl, Ad, Adu, y, &n, &info);
-printf("After 1. \n");
+//printf("After 1. \n");
 
   // 2. compute BtB=B*B (B*B = B*transpose(B) because of the symmetric property)
 dsymm(&left, &upper, &n, &n, &dOne, B, &n, B, &n, &dZero, BtB, &n);
-printf("After 2. \n");
+//printf("After 2. \n");
 
   // 3. copmute b=BtB*y
   // TODO: Storage method needs to be changed to be able to use sbmv!
   //dsbmv(&upper, &n, &two, &dOne, BtB, &n, y, &iOne, &dZero, y, &iOne);
 dsymv(&upper, &n, &dOne, BtB, &n, y, &iOne, &dZero, b, &iOne);
-printf("After 3. \n");
+//printf("After 3. \n");
 
   // 4. compute RA=R*A
 dsymm(&right, &upper, &nm1, &n, &dOne, A, &n, R, &nm1, &dZero, RA, &nm1);
 //dgemm(&no, &no, &nm1, &n, &n, &dOne, R, &nm1, A, &n, &dZero, RA, &nm1);
-printf("After 4. \n");
+//printf("After 4. \n");
   
 
 // For multiple iteration the code will loop from stepp 5. to step 10.
@@ -234,25 +238,26 @@ memcpy(Q,BtB,n*n*sizeof(double));
 
   // 5. compute v=R*x
 dgemv(&no, &nm1, &n, &dOne, R, &nm1, x, &iOne, &dZero, v, &iOne);
-printf("After 5. \n");
+//printf("After 5. \n");
 
   // 6. compute P=transpose(RA)*L
 //cblas_dgemm(CblasRowMajor,&trans, &no, &n, &nm1, &nm1, &dOne, RA, &nm1, L, &nm1, &dZero, P, &n);
 //cblas_dgemm(CblasRowMajor, CblasTrans, CblasNoTrans, n, nm1, nm1, 1. , RA, n, L, nm1, dZero, P, nm1);
 dgemm(&trans, &no, &n, &nm1, &nm1, &dOne, RA, &nm1, L, &nm1, &dZero, P, &n);
-printf("After 6. \n");
+//printf("After 6. \n");
+ 
   
   // TODO: Set Q = copy(BtB). Use Band Storage!!!
   // 7. compute Q = P*RA+Q
 dgemm(&no, &no, &n, &n, &nm1, &dOne, P, &n, RA, &nm1, &dOne, Q, &n);
-printf("After 7. \n");
+//printf("After 7. \n");
 
   // 8. solve Q*b'=b. 
   // TODO: Adapt to be able to use dgbsv(band) instead of dgesv(sym)
 //dgbsv(&n, &three, &three, &iOne, Q, &n, ipiv, b, &n, &info );
 dgesv( &n, &iOne, Q, &n, ipiv, b, &n, &info );
 
-printf("After 8. \n");
+//printf("After 8. \n");
 
 //LAPACKE_dgesv(LAPACK_COL_MAJOR, n, 1, Q, n, ipiv, b, n);
 
@@ -282,16 +287,22 @@ for(i=0;i<n;i++){
   // TODO: set x=copy(b)?? to check
 
   // 9. Compute x=A*b
-dgbmv(&no, &n, &n, &iOne, &iOne, &dOne, A, &n, b, &iOne, &dZero, x, &iOne);
+//dgbmv(&no, &n, &n, &iOne, &iOne, &dOne, A, &n, b, &iOne, &dZero, x, &iOne);
+dsymv(&upper, &n, &dOne, A, &n, b, &iOne, &dZero, x, &iOne);
 
+//printf("\nAfter computation \n");
+//printf("\n");
 
-printf("\nAfter computation \n");
-printf("\n");
+/* end of time measurement*/
+	s_elapsed = (dsecnd() - s_initial);
+
 
 /*---------------------------------------------*/
 /* Print every matrix and vector defined above */
 /*---------------------------------------------*/
+
 /*
+
 // Print A
 for(i=0;i<n;i++){
 	for(j=0;j<n;j++){
@@ -436,7 +447,10 @@ for(i=0;i<n;i++){
  
 printf("\n");
 printf("\n");
+
 */
+
+printf("%.5f seconds \n\n", (s_elapsed));
 
 /*---------------------------------------------------------------*/
 /* Free up all the matrices and vectors defined for this problem */
